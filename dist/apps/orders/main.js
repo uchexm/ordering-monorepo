@@ -91,7 +91,7 @@ let OrdersController = class OrdersController {
     }
     async createOrder(request, req) {
         console.log(req.user);
-        return this.ordersService.createOrder(request);
+        return this.ordersService.createOrder(request, req.cookies?.Authentication);
     }
     async getOrders() {
         return this.ordersService.getOrders();
@@ -255,11 +255,11 @@ let OrdersService = class OrdersService {
         this.ordersRepository = ordersRepository;
         this.billingClient = billingClient;
     }
-    async createOrder(request) {
+    async createOrder(request, authentication) {
         const session = await this.ordersRepository.startTransaction();
         try {
             const order = await this.ordersRepository.create(request, { session });
-            await (0, rxjs_1.lastValueFrom)(this.billingClient.emit('order_created', { request }));
+            await (0, rxjs_1.lastValueFrom)(this.billingClient.emit('order_created', { request, Authentication: authentication }));
             await session.commitTransaction();
             return order;
         }
