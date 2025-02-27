@@ -88,7 +88,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthModule = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
-const jwt_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module '@nestjs/jwt'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const jwt_1 = __webpack_require__(/*! @nestjs/jwt */ "@nestjs/jwt");
 const common_2 = __webpack_require__(/*! @app/common */ "./libs/common/src/index.ts");
 const Joi = __webpack_require__(/*! joi */ "joi");
 const auth_controller_1 = __webpack_require__(/*! ./auth.controller */ "./apps/auth/src/auth.controller.ts");
@@ -153,7 +153,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AuthService = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
-const jwt_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module '@nestjs/jwt'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const jwt_1 = __webpack_require__(/*! @nestjs/jwt */ "@nestjs/jwt");
 let AuthService = class AuthService {
     configService;
     jwtService;
@@ -222,7 +222,7 @@ exports.CurrentUser = (0, common_1.createParamDecorator)((_data, context) => (0,
 
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const passport_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module '@nestjs/passport'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const passport_1 = __webpack_require__(/*! @nestjs/passport */ "@nestjs/passport");
 class JwtAuthGuard extends (0, passport_1.AuthGuard)('jwt') {
 }
 exports["default"] = JwtAuthGuard;
@@ -239,7 +239,7 @@ exports["default"] = JwtAuthGuard;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.LocalAuthGuard = void 0;
-const passport_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module '@nestjs/passport'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const passport_1 = __webpack_require__(/*! @nestjs/passport */ "@nestjs/passport");
 class LocalAuthGuard extends (0, passport_1.AuthGuard)('local') {
 }
 exports.LocalAuthGuard = LocalAuthGuard;
@@ -268,8 +268,8 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.JwtStrategy = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
-const passport_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module '@nestjs/passport'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
-const passport_jwt_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module 'passport-jwt'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const passport_1 = __webpack_require__(/*! @nestjs/passport */ "@nestjs/passport");
+const passport_jwt_1 = __webpack_require__(/*! passport-jwt */ "passport-jwt");
 const mongoose_1 = __webpack_require__(/*! mongoose */ "mongoose");
 const users_service_1 = __webpack_require__(/*! ../users/users.service */ "./apps/auth/src/users/users.service.ts");
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy) {
@@ -325,8 +325,8 @@ var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.LocalStrategy = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
-const passport_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module '@nestjs/passport'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
-const passport_local_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module 'passport-local'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const passport_1 = __webpack_require__(/*! @nestjs/passport */ "@nestjs/passport");
+const passport_local_1 = __webpack_require__(/*! passport-local */ "passport-local");
 const users_service_1 = __webpack_require__(/*! ../users/users.service */ "./apps/auth/src/users/users.service.ts");
 let LocalStrategy = class LocalStrategy extends (0, passport_1.PassportStrategy)(passport_local_1.Strategy) {
     usersService;
@@ -578,7 +578,7 @@ var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.UsersService = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
-const bcrypt = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module 'bcrypt'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const bcrypt = __webpack_require__(/*! bcrypt */ "bcrypt");
 const users_repository_1 = __webpack_require__(/*! ./users.repository */ "./apps/auth/src/users/users.repository.ts");
 let UsersService = class UsersService {
     usersRepository;
@@ -600,7 +600,14 @@ let UsersService = class UsersService {
                 email: request.email,
             });
         }
-        catch (err) { }
+        catch (err) {
+            if (err instanceof common_1.NotFoundException) {
+                user = null;
+            }
+            else {
+                throw err;
+            }
+        }
         if (user) {
             throw new common_1.UnprocessableEntityException('Email already exists.');
         }
@@ -622,6 +629,130 @@ exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [typeof (_a = typeof users_repository_1.UsersRepository !== "undefined" && users_repository_1.UsersRepository) === "function" ? _a : Object])
 ], UsersService);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/auth/auth.module.ts":
+/*!*********************************************!*\
+  !*** ./libs/common/src/auth/auth.module.ts ***!
+  \*********************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AuthModule = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const rmq_module_1 = __webpack_require__(/*! ../rmq/rmq.module */ "./libs/common/src/rmq/rmq.module.ts");
+const services_1 = __webpack_require__(/*! ./services */ "./libs/common/src/auth/services.ts");
+const cookieParser = __webpack_require__(/*! cookie-parser */ "cookie-parser");
+let AuthModule = class AuthModule {
+    configure(consumer) {
+        consumer.apply(cookieParser).forRoutes('*');
+    }
+};
+exports.AuthModule = AuthModule;
+exports.AuthModule = AuthModule = __decorate([
+    (0, common_1.Module)({
+        imports: [rmq_module_1.RmqModule.register({
+                name: services_1.AUTH_SERVICE
+            })],
+        controllers: [],
+        providers: [],
+        exports: [rmq_module_1.RmqModule],
+    })
+], AuthModule);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/auth/jwt-auth.guard.ts":
+/*!************************************************!*\
+  !*** ./libs/common/src/auth/jwt-auth.guard.ts ***!
+  \************************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.JwtAuthGuard = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const rxjs_1 = __webpack_require__(/*! rxjs */ "rxjs");
+const services_1 = __webpack_require__(/*! ./services */ "./libs/common/src/auth/services.ts");
+const microservices_1 = __webpack_require__(/*! @nestjs/microservices */ "@nestjs/microservices");
+let JwtAuthGuard = class JwtAuthGuard {
+    authClient;
+    constructor(authClient) {
+        this.authClient = authClient;
+    }
+    canActivate(context) {
+        const authentication = this.getAuthentication(context);
+        return this.authClient.send('validate_user', authentication).pipe((0, rxjs_1.tap)((res) => {
+            this.addUser(res, context);
+        }), (0, rxjs_1.catchError)(() => {
+            throw new common_1.UnauthorizedException('Invalid authentication');
+        }));
+    }
+    getAuthentication(context) {
+        let authentication;
+        if (context.getType() === 'rpc') {
+            authentication = context.switchToRpc().getData().Authentication;
+        }
+        else if (context.getType() === 'http') {
+            authentication = context.switchToHttp().getRequest().cookies?.Authentication;
+        }
+        if (!authentication) {
+            throw new Error('No authentication provided');
+        }
+        return authentication;
+    }
+    addUser(user, context) {
+        if (context.getType() === 'rpc') {
+            context.switchToRpc().getData().user = user;
+        }
+        else if (context.getType() === 'http') {
+            context.switchToHttp().getRequest().user = user;
+        }
+    }
+};
+exports.JwtAuthGuard = JwtAuthGuard;
+exports.JwtAuthGuard = JwtAuthGuard = __decorate([
+    (0, common_1.Injectable)(),
+    __param(0, (0, common_1.Inject)(services_1.AUTH_SERVICE)),
+    __metadata("design:paramtypes", [typeof (_a = typeof microservices_1.ClientProxy !== "undefined" && microservices_1.ClientProxy) === "function" ? _a : Object])
+], JwtAuthGuard);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/auth/services.ts":
+/*!******************************************!*\
+  !*** ./libs/common/src/auth/services.ts ***!
+  \******************************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AUTH_SERVICE = void 0;
+exports.AUTH_SERVICE = 'AUTH';
 
 
 /***/ }),
@@ -798,6 +929,8 @@ __exportStar(__webpack_require__(/*! ./database/abstract.repository */ "./libs/c
 __exportStar(__webpack_require__(/*! ./database/abstract.schema */ "./libs/common/src/database/abstract.schema.ts"), exports);
 __exportStar(__webpack_require__(/*! ./rmq/rmq.service */ "./libs/common/src/rmq/rmq.service.ts"), exports);
 __exportStar(__webpack_require__(/*! ./rmq/rmq.module */ "./libs/common/src/rmq/rmq.module.ts"), exports);
+__exportStar(__webpack_require__(/*! ./auth/auth.module */ "./libs/common/src/auth/auth.module.ts"), exports);
+__exportStar(__webpack_require__(/*! ./auth/jwt-auth.guard */ "./libs/common/src/auth/jwt-auth.guard.ts"), exports);
 
 
 /***/ }),
@@ -941,6 +1074,16 @@ module.exports = require("@nestjs/core");
 
 /***/ }),
 
+/***/ "@nestjs/jwt":
+/*!******************************!*\
+  !*** external "@nestjs/jwt" ***!
+  \******************************/
+/***/ ((module) => {
+
+module.exports = require("@nestjs/jwt");
+
+/***/ }),
+
 /***/ "@nestjs/microservices":
 /*!****************************************!*\
   !*** external "@nestjs/microservices" ***!
@@ -961,6 +1104,26 @@ module.exports = require("@nestjs/mongoose");
 
 /***/ }),
 
+/***/ "@nestjs/passport":
+/*!***********************************!*\
+  !*** external "@nestjs/passport" ***!
+  \***********************************/
+/***/ ((module) => {
+
+module.exports = require("@nestjs/passport");
+
+/***/ }),
+
+/***/ "bcrypt":
+/*!*************************!*\
+  !*** external "bcrypt" ***!
+  \*************************/
+/***/ ((module) => {
+
+module.exports = require("bcrypt");
+
+/***/ }),
+
 /***/ "class-validator":
 /*!**********************************!*\
   !*** external "class-validator" ***!
@@ -968,6 +1131,16 @@ module.exports = require("@nestjs/mongoose");
 /***/ ((module) => {
 
 module.exports = require("class-validator");
+
+/***/ }),
+
+/***/ "cookie-parser":
+/*!********************************!*\
+  !*** external "cookie-parser" ***!
+  \********************************/
+/***/ ((module) => {
+
+module.exports = require("cookie-parser");
 
 /***/ }),
 
@@ -998,6 +1171,36 @@ module.exports = require("joi");
 /***/ ((module) => {
 
 module.exports = require("mongoose");
+
+/***/ }),
+
+/***/ "passport-jwt":
+/*!*******************************!*\
+  !*** external "passport-jwt" ***!
+  \*******************************/
+/***/ ((module) => {
+
+module.exports = require("passport-jwt");
+
+/***/ }),
+
+/***/ "passport-local":
+/*!*********************************!*\
+  !*** external "passport-local" ***!
+  \*********************************/
+/***/ ((module) => {
+
+module.exports = require("passport-local");
+
+/***/ }),
+
+/***/ "rxjs":
+/*!***********************!*\
+  !*** external "rxjs" ***!
+  \***********************/
+/***/ ((module) => {
+
+module.exports = require("rxjs");
 
 /***/ })
 

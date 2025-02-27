@@ -83,12 +83,14 @@ exports.OrdersController = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const orders_service_1 = __webpack_require__(/*! ./orders.service */ "./apps/orders/src/orders.service.ts");
 const create_order_request_1 = __webpack_require__(/*! ./dto/create-order-request */ "./apps/orders/src/dto/create-order-request.ts");
+const common_2 = __webpack_require__(/*! @app/common */ "./libs/common/src/index.ts");
 let OrdersController = class OrdersController {
     ordersService;
     constructor(ordersService) {
         this.ordersService = ordersService;
     }
-    async createOrder(request) {
+    async createOrder(request, req) {
+        console.log(req.user);
         return this.ordersService.createOrder(request);
     }
     async getOrders() {
@@ -98,9 +100,11 @@ let OrdersController = class OrdersController {
 exports.OrdersController = OrdersController;
 __decorate([
     (0, common_1.Post)(),
+    (0, common_1.UseGuards)(common_2.JwtAuthGuard),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [typeof (_b = typeof create_order_request_1.CreateOrderRequest !== "undefined" && create_order_request_1.CreateOrderRequest) === "function" ? _b : Object]),
+    __metadata("design:paramtypes", [typeof (_b = typeof create_order_request_1.CreateOrderRequest !== "undefined" && create_order_request_1.CreateOrderRequest) === "function" ? _b : Object, Object]),
     __metadata("design:returntype", Promise)
 ], OrdersController.prototype, "createOrder", null);
 __decorate([
@@ -162,6 +166,7 @@ exports.OrdersModule = OrdersModule = __decorate([
                     schema: order_schema_1.OrderSchema
                 }]),
             common_2.RmqModule.register({ name: services_1.BILLING_SERVICE }),
+            common_2.AuthModule,
         ],
         controllers: [orders_controller_1.OrdersController],
         providers: [orders_service_1.OrdersService, orders_repository_1.OrdersRepository],
@@ -322,6 +327,130 @@ exports.Order = Order = __decorate([
     })
 ], Order);
 exports.OrderSchema = mongoose_1.SchemaFactory.createForClass(Order);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/auth/auth.module.ts":
+/*!*********************************************!*\
+  !*** ./libs/common/src/auth/auth.module.ts ***!
+  \*********************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AuthModule = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const rmq_module_1 = __webpack_require__(/*! ../rmq/rmq.module */ "./libs/common/src/rmq/rmq.module.ts");
+const services_1 = __webpack_require__(/*! ./services */ "./libs/common/src/auth/services.ts");
+const cookieParser = __webpack_require__(/*! cookie-parser */ "cookie-parser");
+let AuthModule = class AuthModule {
+    configure(consumer) {
+        consumer.apply(cookieParser).forRoutes('*');
+    }
+};
+exports.AuthModule = AuthModule;
+exports.AuthModule = AuthModule = __decorate([
+    (0, common_1.Module)({
+        imports: [rmq_module_1.RmqModule.register({
+                name: services_1.AUTH_SERVICE
+            })],
+        controllers: [],
+        providers: [],
+        exports: [rmq_module_1.RmqModule],
+    })
+], AuthModule);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/auth/jwt-auth.guard.ts":
+/*!************************************************!*\
+  !*** ./libs/common/src/auth/jwt-auth.guard.ts ***!
+  \************************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.JwtAuthGuard = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const rxjs_1 = __webpack_require__(/*! rxjs */ "rxjs");
+const services_1 = __webpack_require__(/*! ./services */ "./libs/common/src/auth/services.ts");
+const microservices_1 = __webpack_require__(/*! @nestjs/microservices */ "@nestjs/microservices");
+let JwtAuthGuard = class JwtAuthGuard {
+    authClient;
+    constructor(authClient) {
+        this.authClient = authClient;
+    }
+    canActivate(context) {
+        const authentication = this.getAuthentication(context);
+        return this.authClient.send('validate_user', authentication).pipe((0, rxjs_1.tap)((res) => {
+            this.addUser(res, context);
+        }), (0, rxjs_1.catchError)(() => {
+            throw new common_1.UnauthorizedException('Invalid authentication');
+        }));
+    }
+    getAuthentication(context) {
+        let authentication;
+        if (context.getType() === 'rpc') {
+            authentication = context.switchToRpc().getData().Authentication;
+        }
+        else if (context.getType() === 'http') {
+            authentication = context.switchToHttp().getRequest().cookies?.Authentication;
+        }
+        if (!authentication) {
+            throw new Error('No authentication provided');
+        }
+        return authentication;
+    }
+    addUser(user, context) {
+        if (context.getType() === 'rpc') {
+            context.switchToRpc().getData().user = user;
+        }
+        else if (context.getType() === 'http') {
+            context.switchToHttp().getRequest().user = user;
+        }
+    }
+};
+exports.JwtAuthGuard = JwtAuthGuard;
+exports.JwtAuthGuard = JwtAuthGuard = __decorate([
+    (0, common_1.Injectable)(),
+    __param(0, (0, common_1.Inject)(services_1.AUTH_SERVICE)),
+    __metadata("design:paramtypes", [typeof (_a = typeof microservices_1.ClientProxy !== "undefined" && microservices_1.ClientProxy) === "function" ? _a : Object])
+], JwtAuthGuard);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/auth/services.ts":
+/*!******************************************!*\
+  !*** ./libs/common/src/auth/services.ts ***!
+  \******************************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.AUTH_SERVICE = void 0;
+exports.AUTH_SERVICE = 'AUTH';
 
 
 /***/ }),
@@ -498,6 +627,8 @@ __exportStar(__webpack_require__(/*! ./database/abstract.repository */ "./libs/c
 __exportStar(__webpack_require__(/*! ./database/abstract.schema */ "./libs/common/src/database/abstract.schema.ts"), exports);
 __exportStar(__webpack_require__(/*! ./rmq/rmq.service */ "./libs/common/src/rmq/rmq.service.ts"), exports);
 __exportStar(__webpack_require__(/*! ./rmq/rmq.module */ "./libs/common/src/rmq/rmq.module.ts"), exports);
+__exportStar(__webpack_require__(/*! ./auth/auth.module */ "./libs/common/src/auth/auth.module.ts"), exports);
+__exportStar(__webpack_require__(/*! ./auth/jwt-auth.guard */ "./libs/common/src/auth/jwt-auth.guard.ts"), exports);
 
 
 /***/ }),
@@ -668,6 +799,16 @@ module.exports = require("@nestjs/mongoose");
 /***/ ((module) => {
 
 module.exports = require("class-validator");
+
+/***/ }),
+
+/***/ "cookie-parser":
+/*!********************************!*\
+  !*** external "cookie-parser" ***!
+  \********************************/
+/***/ ((module) => {
+
+module.exports = require("cookie-parser");
 
 /***/ }),
 
