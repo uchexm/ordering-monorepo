@@ -14,7 +14,7 @@ import { Order, OrderSchema } from './schemas/order.schema';
       envFilePath: './apps/orders/.env',
       isGlobal: true,
       validationSchema: Joi.object({
-        // PORT: Joi.number().default(3000),
+        PORT: Joi.number().required(),
         MONGODB_URI: Joi.string().required(),
     }),
   }),
