@@ -2,6 +2,20 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
+/***/ "./apps/orders/src/constants/services.ts":
+/*!***********************************************!*\
+  !*** ./apps/orders/src/constants/services.ts ***!
+  \***********************************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.BILLING_SERVICE = void 0;
+exports.BILLING_SERVICE = 'BILLING';
+
+
+/***/ }),
+
 /***/ "./apps/orders/src/dto/create-order-request.ts":
 /*!*****************************************************!*\
   !*** ./apps/orders/src/dto/create-order-request.ts ***!
@@ -127,6 +141,7 @@ const common_2 = __webpack_require__(/*! @app/common */ "./libs/common/src/index
 const orders_repository_1 = __webpack_require__(/*! ./orders.repository */ "./apps/orders/src/orders.repository.ts");
 const mongoose_1 = __webpack_require__(/*! @nestjs/mongoose */ "@nestjs/mongoose");
 const order_schema_1 = __webpack_require__(/*! ./schemas/order.schema */ "./apps/orders/src/schemas/order.schema.ts");
+const services_1 = __webpack_require__(/*! ./constants/services */ "./apps/orders/src/constants/services.ts");
 let OrdersModule = class OrdersModule {
 };
 exports.OrdersModule = OrdersModule;
@@ -144,8 +159,9 @@ exports.OrdersModule = OrdersModule = __decorate([
             common_2.DatabaseModule,
             mongoose_1.MongooseModule.forFeature([{
                     name: order_schema_1.Order.name,
-                    schema: order_schema_1.OrderSchema,
-                }])
+                    schema: order_schema_1.OrderSchema
+                }]),
+            common_2.RmqModule.register({ name: services_1.BILLING_SERVICE }),
         ],
         controllers: [orders_controller_1.OrdersController],
         providers: [orders_service_1.OrdersService, orders_repository_1.OrdersRepository],
@@ -178,22 +194,20 @@ var OrdersRepository_1;
 var _a, _b;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OrdersRepository = void 0;
-const common_1 = __webpack_require__(/*! @app/common */ "./libs/common/src/index.ts");
-const common_2 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
-const order_schema_1 = __webpack_require__(/*! ./schemas/order.schema */ "./apps/orders/src/schemas/order.schema.ts");
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const common_2 = __webpack_require__(/*! @app/common */ "./libs/common/src/index.ts");
 const mongoose_1 = __webpack_require__(/*! @nestjs/mongoose */ "@nestjs/mongoose");
 const mongoose_2 = __webpack_require__(/*! mongoose */ "mongoose");
-let OrdersRepository = OrdersRepository_1 = class OrdersRepository extends common_1.AbstractRepository {
-    logger = new common_2.Logger(OrdersRepository_1.name);
+const order_schema_1 = __webpack_require__(/*! ./schemas/order.schema */ "./apps/orders/src/schemas/order.schema.ts");
+let OrdersRepository = OrdersRepository_1 = class OrdersRepository extends common_2.AbstractRepository {
+    logger = new common_1.Logger(OrdersRepository_1.name);
     constructor(orderModel, connection) {
-        super(orderModel);
-        this.connection = connection;
+        super(orderModel, connection);
     }
-    connection;
 };
 exports.OrdersRepository = OrdersRepository;
 exports.OrdersRepository = OrdersRepository = OrdersRepository_1 = __decorate([
-    (0, common_2.Injectable)(),
+    (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(order_schema_1.Order.name)),
     __param(1, (0, mongoose_1.InjectConnection)()),
     __metadata("design:paramtypes", [typeof (_a = typeof mongoose_2.Model !== "undefined" && mongoose_2.Model) === "function" ? _a : Object, typeof (_b = typeof mongoose_2.Connection !== "undefined" && mongoose_2.Connection) === "function" ? _b : Object])
@@ -218,18 +232,36 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var _a;
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var _a, _b;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OrdersService = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const orders_repository_1 = __webpack_require__(/*! ./orders.repository */ "./apps/orders/src/orders.repository.ts");
+const services_1 = __webpack_require__(/*! ./constants/services */ "./apps/orders/src/constants/services.ts");
+const microservices_1 = __webpack_require__(/*! @nestjs/microservices */ "@nestjs/microservices");
+const rxjs_1 = __webpack_require__(/*! rxjs */ "rxjs");
 let OrdersService = class OrdersService {
     ordersRepository;
-    constructor(ordersRepository) {
+    billingClient;
+    constructor(ordersRepository, billingClient) {
         this.ordersRepository = ordersRepository;
+        this.billingClient = billingClient;
     }
     async createOrder(request) {
-        return this.ordersRepository.create(request);
+        const session = await this.ordersRepository.startTransaction();
+        try {
+            const order = await this.ordersRepository.create(request, { session });
+            await (0, rxjs_1.lastValueFrom)(this.billingClient.emit('order_created', { request }));
+            await session.commitTransaction();
+            return order;
+        }
+        catch (e) {
+            await session.abortTransaction();
+            throw e;
+        }
     }
     async getOrders() {
         return this.ordersRepository.find({});
@@ -238,7 +270,8 @@ let OrdersService = class OrdersService {
 exports.OrdersService = OrdersService;
 exports.OrdersService = OrdersService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [typeof (_a = typeof orders_repository_1.OrdersRepository !== "undefined" && orders_repository_1.OrdersRepository) === "function" ? _a : Object])
+    __param(1, (0, common_1.Inject)(services_1.BILLING_SERVICE)),
+    __metadata("design:paramtypes", [typeof (_a = typeof orders_repository_1.OrdersRepository !== "undefined" && orders_repository_1.OrdersRepository) === "function" ? _a : Object, typeof (_b = typeof microservices_1.ClientProxy !== "undefined" && microservices_1.ClientProxy) === "function" ? _b : Object])
 ], OrdersService);
 
 
@@ -302,57 +335,55 @@ exports.OrderSchema = mongoose_1.SchemaFactory.createForClass(Order);
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AbstractRepository = void 0;
-const mongoose_1 = __webpack_require__(/*! mongoose */ "mongoose");
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const mongoose_1 = __webpack_require__(/*! mongoose */ "mongoose");
 class AbstractRepository {
     model;
-    constructor(model) {
+    connection;
+    constructor(model, connection) {
         this.model = model;
+        this.connection = connection;
     }
-    async create(document) {
+    async create(document, options) {
         const createdDocument = new this.model({
             ...document,
             _id: new mongoose_1.Types.ObjectId(),
         });
-        return (await createdDocument.save()).toJSON();
+        return (await createdDocument.save(options)).toJSON();
     }
     async findOne(filterQuery) {
-        const document = await this.model
-            .findOne(filterQuery)
-            .lean(true);
+        const document = await this.model.findOne(filterQuery, {}, { lean: true });
         if (!document) {
-            this.logger.warn('Document was not found with filterQuery', filterQuery);
-            throw new common_1.NotFoundException('Document was not found');
+            this.logger.warn('Document not found with filterQuery', filterQuery);
+            throw new common_1.NotFoundException('Document not found.');
         }
         return document;
     }
     async findOneAndUpdate(filterQuery, update) {
-        const document = await this.model
-            .findOneAndUpdate(filterQuery, update, {
+        const document = await this.model.findOneAndUpdate(filterQuery, update, {
+            lean: true,
             new: true,
-        })
-            .lean(true);
+        });
         if (!document) {
-            this.logger.warn('Document was not found with filterQuery', filterQuery);
-            throw new common_1.NotFoundException('Document was not found');
+            this.logger.warn(`Document not found with filterQuery:`, filterQuery);
+            throw new common_1.NotFoundException('Document not found.');
         }
         return document;
+    }
+    async upsert(filterQuery, document) {
+        return this.model.findOneAndUpdate(filterQuery, document, {
+            lean: true,
+            upsert: true,
+            new: true,
+        });
     }
     async find(filterQuery) {
-        const documents = await this.model
-            .find(filterQuery)
-            .lean(true);
-        return documents;
+        return this.model.find(filterQuery, {}, { lean: true });
     }
-    async findOneAndDelete(filterQuery) {
-        const document = await this.model
-            .findOneAndDelete(filterQuery)
-            .lean(true);
-        if (!document) {
-            this.logger.warn('Document was not found with filterQuery', filterQuery);
-            throw new common_1.NotFoundException('Document was not found');
-        }
-        return document;
+    async startTransaction() {
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        return session;
     }
 }
 exports.AbstractRepository = AbstractRepository;
@@ -484,14 +515,38 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var RmqModule_1;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RmqModule = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const rmq_service_1 = __webpack_require__(/*! ./rmq.service */ "./libs/common/src/rmq/rmq.service.ts");
-let RmqModule = class RmqModule {
+const microservices_1 = __webpack_require__(/*! @nestjs/microservices */ "@nestjs/microservices");
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+let RmqModule = RmqModule_1 = class RmqModule {
+    static register({ name }) {
+        return {
+            module: RmqModule_1,
+            imports: [
+                microservices_1.ClientsModule.registerAsync([{
+                        name,
+                        useFactory: (ConfigService) => ({
+                            transport: microservices_1.Transport.RMQ,
+                            options: {
+                                urls: [ConfigService.get('RABBIT_MQ_URI') || 'amqp://localhost'],
+                                queue: ConfigService.get(`RABBIT_MQ_${name}_QUEUE`),
+                                noAck: true,
+                                persistent: true,
+                            },
+                        }),
+                        inject: [config_1.ConfigService],
+                    }])
+            ],
+            exports: [microservices_1.ClientsModule]
+        };
+    }
 };
 exports.RmqModule = RmqModule;
-exports.RmqModule = RmqModule = __decorate([
+exports.RmqModule = RmqModule = RmqModule_1 = __decorate([
     (0, common_1.Module)({
         imports: [],
         controllers: [],
@@ -540,6 +595,11 @@ let RmqService = class RmqService {
                 persistent: true,
             }
         };
+    }
+    ack(context) {
+        const channel = context.getChannelRef();
+        const originalMsg = context.getMessage();
+        channel.ack(originalMsg);
     }
 };
 exports.RmqService = RmqService;
@@ -628,6 +688,16 @@ module.exports = require("joi");
 /***/ ((module) => {
 
 module.exports = require("mongoose");
+
+/***/ }),
+
+/***/ "rxjs":
+/*!***********************!*\
+  !*** external "rxjs" ***!
+  \***********************/
+/***/ ((module) => {
+
+module.exports = require("rxjs");
 
 /***/ })
 

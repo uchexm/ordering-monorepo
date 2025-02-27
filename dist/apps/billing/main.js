@@ -18,18 +18,29 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var _a;
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var _a, _b, _c;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BillingController = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const billing_service_1 = __webpack_require__(/*! ./billing.service */ "./apps/billing/src/billing.service.ts");
+const microservices_1 = __webpack_require__(/*! @nestjs/microservices */ "@nestjs/microservices");
+const common_2 = __webpack_require__(/*! @app/common */ "./libs/common/src/index.ts");
 let BillingController = class BillingController {
     billingService;
-    constructor(billingService) {
+    rmqService;
+    constructor(billingService, rmqService) {
         this.billingService = billingService;
+        this.rmqService = rmqService;
     }
     getHello() {
         return this.billingService.getHello();
+    }
+    async handleOrderCreated(data, context) {
+        this.billingService.bill(data);
+        this.rmqService.ack(context);
     }
 };
 exports.BillingController = BillingController;
@@ -39,9 +50,17 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", String)
 ], BillingController.prototype, "getHello", null);
+__decorate([
+    (0, microservices_1.EventPattern)('order_created'),
+    __param(0, (0, microservices_1.Payload)()),
+    __param(1, (0, microservices_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeof (_c = typeof microservices_1.RmqContext !== "undefined" && microservices_1.RmqContext) === "function" ? _c : Object]),
+    __metadata("design:returntype", Promise)
+], BillingController.prototype, "handleOrderCreated", null);
 exports.BillingController = BillingController = __decorate([
     (0, common_1.Controller)(),
-    __metadata("design:paramtypes", [typeof (_a = typeof billing_service_1.BillingService !== "undefined" && billing_service_1.BillingService) === "function" ? _a : Object])
+    __metadata("design:paramtypes", [typeof (_a = typeof billing_service_1.BillingService !== "undefined" && billing_service_1.BillingService) === "function" ? _a : Object, typeof (_b = typeof common_2.RmqService !== "undefined" && common_2.RmqService) === "function" ? _b : Object])
 ], BillingController);
 
 
@@ -67,7 +86,7 @@ const billing_controller_1 = __webpack_require__(/*! ./billing.controller */ "./
 const billing_service_1 = __webpack_require__(/*! ./billing.service */ "./apps/billing/src/billing.service.ts");
 const common_2 = __webpack_require__(/*! @app/common */ "./libs/common/src/index.ts");
 const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
-const joi_1 = __webpack_require__(/*! joi */ "joi");
+const Joi = __webpack_require__(/*! joi */ "joi");
 let BillingModule = class BillingModule {
 };
 exports.BillingModule = BillingModule;
@@ -75,9 +94,9 @@ exports.BillingModule = BillingModule = __decorate([
     (0, common_1.Module)({
         imports: [config_1.ConfigModule.forRoot({
                 isGlobal: true,
-                validationSchema: joi_1.default.object({
-                    RABBIT_MQ_URI: joi_1.default.string().required(),
-                    RABBIT_MQ_BILLING_QUEUE: joi_1.default.string().required(),
+                validationSchema: Joi.object({
+                    RABBIT_MQ_URI: Joi.string().required(),
+                    RABBIT_MQ_BILLING_QUEUE: Joi.string().required(),
                 })
             }),
             common_2.RmqModule],
@@ -102,16 +121,21 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var BillingService_1;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BillingService = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
-let BillingService = class BillingService {
+let BillingService = BillingService_1 = class BillingService {
+    logger = new common_1.Logger(BillingService_1.name);
     getHello() {
         return 'Hello World!';
     }
+    bill(data) {
+        this.logger.log('Billing...', data);
+    }
 };
 exports.BillingService = BillingService;
-exports.BillingService = BillingService = __decorate([
+exports.BillingService = BillingService = BillingService_1 = __decorate([
     (0, common_1.Injectable)()
 ], BillingService);
 
@@ -127,57 +151,55 @@ exports.BillingService = BillingService = __decorate([
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AbstractRepository = void 0;
-const mongoose_1 = __webpack_require__(/*! mongoose */ "mongoose");
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const mongoose_1 = __webpack_require__(/*! mongoose */ "mongoose");
 class AbstractRepository {
     model;
-    constructor(model) {
+    connection;
+    constructor(model, connection) {
         this.model = model;
+        this.connection = connection;
     }
-    async create(document) {
+    async create(document, options) {
         const createdDocument = new this.model({
             ...document,
             _id: new mongoose_1.Types.ObjectId(),
         });
-        return (await createdDocument.save()).toJSON();
+        return (await createdDocument.save(options)).toJSON();
     }
     async findOne(filterQuery) {
-        const document = await this.model
-            .findOne(filterQuery)
-            .lean(true);
+        const document = await this.model.findOne(filterQuery, {}, { lean: true });
         if (!document) {
-            this.logger.warn('Document was not found with filterQuery', filterQuery);
-            throw new common_1.NotFoundException('Document was not found');
+            this.logger.warn('Document not found with filterQuery', filterQuery);
+            throw new common_1.NotFoundException('Document not found.');
         }
         return document;
     }
     async findOneAndUpdate(filterQuery, update) {
-        const document = await this.model
-            .findOneAndUpdate(filterQuery, update, {
+        const document = await this.model.findOneAndUpdate(filterQuery, update, {
+            lean: true,
             new: true,
-        })
-            .lean(true);
+        });
         if (!document) {
-            this.logger.warn('Document was not found with filterQuery', filterQuery);
-            throw new common_1.NotFoundException('Document was not found');
+            this.logger.warn(`Document not found with filterQuery:`, filterQuery);
+            throw new common_1.NotFoundException('Document not found.');
         }
         return document;
+    }
+    async upsert(filterQuery, document) {
+        return this.model.findOneAndUpdate(filterQuery, document, {
+            lean: true,
+            upsert: true,
+            new: true,
+        });
     }
     async find(filterQuery) {
-        const documents = await this.model
-            .find(filterQuery)
-            .lean(true);
-        return documents;
+        return this.model.find(filterQuery, {}, { lean: true });
     }
-    async findOneAndDelete(filterQuery) {
-        const document = await this.model
-            .findOneAndDelete(filterQuery)
-            .lean(true);
-        if (!document) {
-            this.logger.warn('Document was not found with filterQuery', filterQuery);
-            throw new common_1.NotFoundException('Document was not found');
-        }
-        return document;
+    async startTransaction() {
+        const session = await this.connection.startSession();
+        session.startTransaction();
+        return session;
     }
 }
 exports.AbstractRepository = AbstractRepository;
@@ -309,14 +331,38 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var RmqModule_1;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.RmqModule = void 0;
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 const rmq_service_1 = __webpack_require__(/*! ./rmq.service */ "./libs/common/src/rmq/rmq.service.ts");
-let RmqModule = class RmqModule {
+const microservices_1 = __webpack_require__(/*! @nestjs/microservices */ "@nestjs/microservices");
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+let RmqModule = RmqModule_1 = class RmqModule {
+    static register({ name }) {
+        return {
+            module: RmqModule_1,
+            imports: [
+                microservices_1.ClientsModule.registerAsync([{
+                        name,
+                        useFactory: (ConfigService) => ({
+                            transport: microservices_1.Transport.RMQ,
+                            options: {
+                                urls: [ConfigService.get('RABBIT_MQ_URI') || 'amqp://localhost'],
+                                queue: ConfigService.get(`RABBIT_MQ_${name}_QUEUE`),
+                                noAck: true,
+                                persistent: true,
+                            },
+                        }),
+                        inject: [config_1.ConfigService],
+                    }])
+            ],
+            exports: [microservices_1.ClientsModule]
+        };
+    }
 };
 exports.RmqModule = RmqModule;
-exports.RmqModule = RmqModule = __decorate([
+exports.RmqModule = RmqModule = RmqModule_1 = __decorate([
     (0, common_1.Module)({
         imports: [],
         controllers: [],
@@ -365,6 +411,11 @@ let RmqService = class RmqService {
                 persistent: true,
             }
         };
+    }
+    ack(context) {
+        const channel = context.getChannelRef();
+        const originalMsg = context.getMessage();
+        channel.ack(originalMsg);
     }
 };
 exports.RmqService = RmqService;
