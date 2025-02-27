@@ -1,5 +1,6 @@
 services:
   orders:
+
     build:
       context: .
       dockerfile: ./apps/orders/Dockerfile
@@ -13,7 +14,7 @@ services:
       - mongodb-arbiter
       - billing
       - auth
-      - rabbitmq
+   
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
