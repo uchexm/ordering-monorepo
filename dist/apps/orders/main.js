@@ -20,7 +20,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CreateOrderRequest = void 0;
-const class_validator_1 = __webpack_require__(Object(function webpackMissingModule() { var e = new Error("Cannot find module 'class-validator'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const class_validator_1 = __webpack_require__(/*! class-validator */ "class-validator");
 class CreateOrderRequest {
     name;
     price;
@@ -77,6 +77,9 @@ let OrdersController = class OrdersController {
     async createOrder(request) {
         return this.ordersService.createOrder(request);
     }
+    async getOrders() {
+        return this.ordersService.getOrders();
+    }
 };
 exports.OrdersController = OrdersController;
 __decorate([
@@ -86,8 +89,14 @@ __decorate([
     __metadata("design:paramtypes", [typeof (_b = typeof create_order_request_1.CreateOrderRequest !== "undefined" && create_order_request_1.CreateOrderRequest) === "function" ? _b : Object]),
     __metadata("design:returntype", Promise)
 ], OrdersController.prototype, "createOrder", null);
+__decorate([
+    (0, common_1.Get)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], OrdersController.prototype, "getOrders", null);
 exports.OrdersController = OrdersController = __decorate([
-    (0, common_1.Controller)(),
+    (0, common_1.Controller)('orders'),
     __metadata("design:paramtypes", [typeof (_a = typeof orders_service_1.OrdersService !== "undefined" && orders_service_1.OrdersService) === "function" ? _a : Object])
 ], OrdersController);
 
@@ -221,6 +230,9 @@ let OrdersService = class OrdersService {
     }
     async createOrder(request) {
         return this.ordersRepository.create(request);
+    }
+    async getOrders() {
+        return this.ordersRepository.find({});
     }
 };
 exports.OrdersService = OrdersService;
@@ -453,6 +465,88 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 __exportStar(__webpack_require__(/*! ./database/database.module */ "./libs/common/src/database/database.module.ts"), exports);
 __exportStar(__webpack_require__(/*! ./database/abstract.repository */ "./libs/common/src/database/abstract.repository.ts"), exports);
 __exportStar(__webpack_require__(/*! ./database/abstract.schema */ "./libs/common/src/database/abstract.schema.ts"), exports);
+__exportStar(__webpack_require__(/*! ./rmq/rmq.service */ "./libs/common/src/rmq/rmq.service.ts"), exports);
+__exportStar(__webpack_require__(/*! ./rmq/rmq.module */ "./libs/common/src/rmq/rmq.module.ts"), exports);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/rmq/rmq.module.ts":
+/*!*******************************************!*\
+  !*** ./libs/common/src/rmq/rmq.module.ts ***!
+  \*******************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RmqModule = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const rmq_service_1 = __webpack_require__(/*! ./rmq.service */ "./libs/common/src/rmq/rmq.service.ts");
+let RmqModule = class RmqModule {
+};
+exports.RmqModule = RmqModule;
+exports.RmqModule = RmqModule = __decorate([
+    (0, common_1.Module)({
+        imports: [],
+        controllers: [],
+        providers: [rmq_service_1.RmqService],
+        exports: [rmq_service_1.RmqService],
+    })
+], RmqModule);
+
+
+/***/ }),
+
+/***/ "./libs/common/src/rmq/rmq.service.ts":
+/*!********************************************!*\
+  !*** ./libs/common/src/rmq/rmq.service.ts ***!
+  \********************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var _a;
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RmqService = void 0;
+const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+const microservices_1 = __webpack_require__(/*! @nestjs/microservices */ "@nestjs/microservices");
+let RmqService = class RmqService {
+    configService;
+    constructor(configService) {
+        this.configService = configService;
+    }
+    getOptions(queue, noAck = false) {
+        return {
+            transport: microservices_1.Transport.RMQ,
+            options: {
+                urls: [this.configService.get('RABBIT_MQ_URI') || 'amqp://localhost'],
+                queue: this.configService.get(`RABBIT_MQ_${queue}_QUEUE`),
+                noAck,
+                persistent: true,
+            }
+        };
+    }
+};
+exports.RmqService = RmqService;
+exports.RmqService = RmqService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [typeof (_a = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _a : Object])
+], RmqService);
 
 
 /***/ }),
@@ -487,6 +581,16 @@ module.exports = require("@nestjs/core");
 
 /***/ }),
 
+/***/ "@nestjs/microservices":
+/*!****************************************!*\
+  !*** external "@nestjs/microservices" ***!
+  \****************************************/
+/***/ ((module) => {
+
+module.exports = require("@nestjs/microservices");
+
+/***/ }),
+
 /***/ "@nestjs/mongoose":
 /*!***********************************!*\
   !*** external "@nestjs/mongoose" ***!
@@ -494,6 +598,16 @@ module.exports = require("@nestjs/core");
 /***/ ((module) => {
 
 module.exports = require("@nestjs/mongoose");
+
+/***/ }),
+
+/***/ "class-validator":
+/*!**********************************!*\
+  !*** external "class-validator" ***!
+  \**********************************/
+/***/ ((module) => {
+
+module.exports = require("class-validator");
 
 /***/ }),
 
